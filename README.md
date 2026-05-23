@@ -1,4 +1,6 @@
-# 🚀 Mini AI News Summarizer (Rich Terminal 版)
+# 🚀 Mini AI News Summarizer (Rich Terminal Version)
+
+![Terminal UI](assets/screenshot.png)
 
 一个基于 Python 的极简、高颜值命令行 AI 新闻总结工具。它能从 NewsAPI 实时抓取全球最新头条，并通过 Groq API (Llama 3.3 模型) 自动为你提炼出结构清晰、一目了然的 3 点式核心摘要。
 
