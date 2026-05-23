@@ -26,7 +26,6 @@ news-summarizer/
 ├── news.py             # 新闻获取模块（负责对接 NewsAPI）
 ├── summarize.py        # AI 总结模块（负责对接 Groq Llama 3.3）
 ├── requirements.txt    # 项目第三方依赖依赖包列表
-├── .env                # 敏感配置文件（存放你的 API 密钥，严禁上传！）
 └── .gitignore          # Git 忽略配置文件（保护 .env 安全）
 ```
 
