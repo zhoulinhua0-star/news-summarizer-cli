@@ -7,6 +7,7 @@ from rich.markdown import Markdown
 
 from news import get_top_news
 from summarize import summarize_article
+from push import push_to_wechat
 
 # 初始化 rich 控制台
 console = Console()
@@ -18,7 +19,7 @@ def main():
 
     # 打印欢迎面板
     console.print(Panel.fit(
-        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 2.0 • Powered by Groq & Llama 3.3[/dim]",
+        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 3.0 • Powered by GitHub Actions & ServerChan[/dim]",
         title="[bold green]System Boot[/bold green]",
         border_style="magenta",
         padding=(1, 3)
@@ -36,6 +37,10 @@ def main():
     if not articles:
         console.print("\n[yellow]📭 No news articles found at the moment.[/yellow]")
         return
+
+    # 用于聚合微信推送内容的变量
+    aggregated_summary = "# 📅 今日 AI 新闻硬核简报\n\n"
+    has_valid_content = False
 
     # 3. 遍历新闻，生成并打印总结
     for i, article in enumerate(articles, 1):
@@ -67,8 +72,21 @@ def main():
             padding=(1, 2)
         ))
 
+        # 6. 将内容拼接到微信推送文本中
+        aggregated_summary += f"### 📰 [{i}] {title}\n{summary}\n\n---\n\n"
+        has_valid_content = True
+
     # 打印高亮横幅
     console.print(f"\n[bold reverse green] ✅ All {limit} news stories processed successfully! [/bold reverse green]\n")
+
+    # 7. 触发微信一键推送
+    if has_valid_content:
+        with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="mail"):
+            success = push_to_wechat("📅 您有一份新的 AI 新闻早报", aggregated_summary)
+            if success:
+                console.print("[bold green]✨ [WeChat Push Success] Delivered to your phone![/bold green]\n")
+            else:
+                console.print("[bold red]❌ [WeChat Push Failed] Please check your ServerChan config.[/bold red]\n")
 
 
 if __name__ == "__main__":
