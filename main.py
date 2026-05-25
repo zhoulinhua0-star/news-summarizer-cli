@@ -81,7 +81,7 @@ def main():
 
     # 7. 触发微信一键推送
     if has_valid_content:
-        with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="mail"):
+        with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="dots"):
             success = push_to_wechat("📅 您有一份新的 AI 新闻早报", aggregated_summary)
             if success:
                 console.print("[bold green]✨ [WeChat Push Success] Delivered to your phone![/bold green]\n")
