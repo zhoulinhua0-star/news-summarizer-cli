@@ -19,7 +19,7 @@ def main():
 
     # 打印欢迎面板
     console.print(Panel.fit(
-        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 3.5 • Anti-Word-Wrap Premium Edition[/dim]",
+        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 4.0 • Premium HTML Card Edition[/dim]",
         title="[bold green]System Boot[/bold green]",
         border_style="magenta",
         padding=(1, 3)
@@ -38,17 +38,20 @@ def main():
         console.print("\n[yellow]📭 No news articles found at the moment.[/yellow]")
         return
 
-    # 用于聚合微信推送内容的变量 (手机端精装大标题)
-    aggregated_summary = "## 📅 今日 AI 硬核早报\n\n---\n\n"
+    # 3. 初始化微信端 HTML 容器样式（强制规定：整词换行，不许切断英文）
+    aggregated_summary = """
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; padding: 5px; word-break: normal;">
+        <h2 style="color: #191919; margin-bottom: 20px; border-bottom: 2px solid #07c160; padding-bottom: 8px; font-size: 18px;">📅 今日 AI 硬核早报</h2>
+    """
     has_valid_content = False
 
-    # 3. 遍历新闻，生成并打印总结
+    # 4. 遍历新闻，生成并打印总结
     for i, article in enumerate(articles, 1):
         title = article.get("title") or "No Title Available"
         description = article.get("description") or ""
         url = article.get("url") or "No URL"
 
-        # 使用亮青色打印新闻标题
+        # 本地电脑终端打印（保持炫酷）
         console.print(f"\n[bold cyan]📰 [News {i}]: {title}[/bold cyan]")
         console.print(f"[dim]🔗 Link: {url}[/dim]")
 
@@ -60,11 +63,11 @@ def main():
             ))
             continue
 
-        # 4. 调用 Groq AI
+        # 调用 Groq AI
         with console.status("[bold green]AI is reading and digesting...[/bold green]", spinner="dots"):
             summary = summarize_article(title, description)
 
-        # 5. 用 Markdown 格式将 AI 的 Bullet Points 渲染在漂亮的绿色面板里
+        # 本地电脑终端漂亮的绿色面板渲染
         console.print(Panel(
             Markdown(summary),
             title="[bold green]🤖 AI Summary[/bold green]",
@@ -72,33 +75,37 @@ def main():
             padding=(1, 2)
         ))
 
-        # 6. 【核心优化】清洗 AI 文本，防止手机端英文单词跨行碎裂
-        # 思路：按行切分，去掉多余空行，去掉行尾硬换行，确保每个 Bullet Point 在微信里是一条连贯的流
+        # 5. 【核心清洗】将 AI 返回的 Markdown 列表符号清洗并转化为完美的 HTML 列表
         lines = [line.strip() for line in summary.split("\n") if line.strip()]
-
-        styled_lines = []
+        html_bullets = ""
         for line in lines:
-            # 如果这一行本来就是小圆点或减号开头，保持格式并在最前面加引用号 '>'
-            if line.startswith(("•", "-", "*")):
-                styled_lines.append(f"> {line}")
-            else:
-                # 如果 AI 输出没有自带符号，我们帮它加上规范的小圆点
-                styled_lines.append(f"> • {line}")
+            # 去除 AI 输出可能带有的各种圆点或中划线符号，并清除 Markdown 的加粗符号 **
+            clean_line = line.lstrip("•-* ").strip().replace("**", "")
+            if clean_line:
+                # 每一条总结都强制注入 word-break: normal 确保英文完美换行
+                html_bullets += f"<li style='margin-bottom: 8px; text-align: justify; word-break: normal; word-wrap: break-word;'>{clean_line}</li>"
 
-        # 用单个换行符连起来，确保每一条 Bullet Point 内部没有强制断行
-        cleaned_summary_block = "\n".join(styled_lines)
-
-        # 7. 拼接到微信推送文本中（卡片化排版 + 呼吸留白）
-        aggregated_summary += f"### 📰 {i}. {title}\n\n"
-        aggregated_summary += f"{cleaned_summary_block}\n\n"
-        aggregated_summary += f"*[🔗 点击此处阅读原文]({url})*\n\n"
-        aggregated_summary += f"<br/>\n\n---\n\n"
+        # 6. 【精装排版】构建极具高级感的 HTML 卡片（带灰色淡雅背景、左侧微信绿高亮条）
+        news_card = f"""
+        <div style="margin-bottom: 20px; background-color: #f8f9fa; padding: 14px; border-radius: 8px; border-left: 4px solid #07c160; word-break: normal; word-wrap: break-word; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <h3 style="margin: 0 0 12px 0; color: #111111; font-size: 15px; line-height: 1.4; word-break: normal; word-wrap: break-word;">📰 {i}. {title}</h3>
+            <ul style="padding-left: 18px; margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.5; word-break: normal; word-wrap: break-word;">
+                {html_bullets}
+            </ul>
+            <div style="margin-top: 10px; border-top: 1px dashed #e0e0e0; padding-top: 8px;">
+                <a href="{url}" style="color: #576b95; font-size: 12.5px; text-decoration: none; word-break: break-all;">🔗 点击此处阅读原文</a>
+            </div>
+        </div>
+        """
+        aggregated_summary += news_card
         has_valid_content = True
 
-    # 打印高亮横幅
+    # 闭合 HTML 标签
+    aggregated_summary += "</div>"
+
     console.print(f"\n[bold reverse green] ✅ All {limit} news stories processed successfully! [/bold reverse green]\n")
 
-    # 8. 触发微信一键推送
+    # 7. 触发微信一键推送
     if has_valid_content:
         with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="dots"):
             success = push_to_wechat("📅 您有一份新的 AI 新闻早报", aggregated_summary)

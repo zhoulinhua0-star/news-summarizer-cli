@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def push_to_wechat(title: str, markdown_content: str) -> bool:
+def push_to_wechat(title: str, html_content: str) -> bool:
     """
-    使用 PushPlus 将新闻推送到微信
+    使用 PushPlus 将新闻（精装 HTML 格式）推送到微信
     """
     token = os.getenv("PUSHPLUS_TOKEN")
 
@@ -18,12 +18,12 @@ def push_to_wechat(title: str, markdown_content: str) -> bool:
 
     url = "http://www.pushplus.plus/send"
 
-    # PushPlus 的请求格式
+    # 核心改变：把 template 从 markdown 换成 html
     data = {
         "token": token,
         "title": title,
-        "content": markdown_content,
-        "template": "markdown"  # 完美适配你的 AI 生成的 Markdown 格式
+        "content": html_content,
+        "template": "html"
     }
 
     try:
