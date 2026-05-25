@@ -19,13 +19,13 @@ def main():
 
     # 打印欢迎面板
     console.print(Panel.fit(
-        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 3.0 • Powered by GitHub Actions & ServerChan[/dim]",
+        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 3.5 • Anti-Word-Wrap Premium Edition[/dim]",
         title="[bold green]System Boot[/bold green]",
         border_style="magenta",
         padding=(1, 3)
     ))
 
-    # 2. 获取新闻（使用带地球旋转动画的加载状态）
+    # 2. 获取新闻
     limit = 3
     with console.status("[bold blue]Connecting to NewsAPI and fetching headlines...[/bold blue]", spinner="earth"):
         try:
@@ -38,8 +38,8 @@ def main():
         console.print("\n[yellow]📭 No news articles found at the moment.[/yellow]")
         return
 
-    # 用于聚合微信推送内容的变量
-    aggregated_summary = "# 📅 今日 AI 新闻硬核简报\n\n"
+    # 用于聚合微信推送内容的变量 (手机端精装大标题)
+    aggregated_summary = "## 📅 今日 AI 硬核早报\n\n---\n\n"
     has_valid_content = False
 
     # 3. 遍历新闻，生成并打印总结
@@ -72,21 +72,40 @@ def main():
             padding=(1, 2)
         ))
 
-        # 6. 将内容拼接到微信推送文本中
-        aggregated_summary += f"### 📰 [{i}] {title}\n{summary}\n\n---\n\n"
+        # 6. 【核心优化】清洗 AI 文本，防止手机端英文单词跨行碎裂
+        # 思路：按行切分，去掉多余空行，去掉行尾硬换行，确保每个 Bullet Point 在微信里是一条连贯的流
+        lines = [line.strip() for line in summary.split("\n") if line.strip()]
+
+        styled_lines = []
+        for line in lines:
+            # 如果这一行本来就是小圆点或减号开头，保持格式并在最前面加引用号 '>'
+            if line.startswith(("•", "-", "*")):
+                styled_lines.append(f"> {line}")
+            else:
+                # 如果 AI 输出没有自带符号，我们帮它加上规范的小圆点
+                styled_lines.append(f"> • {line}")
+
+        # 用单个换行符连起来，确保每一条 Bullet Point 内部没有强制断行
+        cleaned_summary_block = "\n".join(styled_lines)
+
+        # 7. 拼接到微信推送文本中（卡片化排版 + 呼吸留白）
+        aggregated_summary += f"### 📰 {i}. {title}\n\n"
+        aggregated_summary += f"{cleaned_summary_block}\n\n"
+        aggregated_summary += f"*[🔗 点击此处阅读原文]({url})*\n\n"
+        aggregated_summary += f"<br/>\n\n---\n\n"
         has_valid_content = True
 
     # 打印高亮横幅
     console.print(f"\n[bold reverse green] ✅ All {limit} news stories processed successfully! [/bold reverse green]\n")
 
-    # 7. 触发微信一键推送
+    # 8. 触发微信一键推送
     if has_valid_content:
         with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="dots"):
             success = push_to_wechat("📅 您有一份新的 AI 新闻早报", aggregated_summary)
             if success:
                 console.print("[bold green]✨ [WeChat Push Success] Delivered to your phone![/bold green]\n")
             else:
-                console.print("[bold red]❌ [WeChat Push Failed] Please check your ServerChan config.[/bold red]\n")
+                console.print("[bold red]❌ [WeChat Push Failed] Please check your PushPlus config.[/bold red]\n")
 
 
 if __name__ == "__main__":
