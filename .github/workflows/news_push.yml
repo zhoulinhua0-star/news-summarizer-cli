@@ -4,7 +4,11 @@ on:
   schedule:
     # 每天国际标准时间 00:00 运行（对应北京时间早上 08:00）
     - cron: '0 0 * * *'
-  workflow_dispatch: # 保留手机/网页端手动一键运行按钮
+  workflow_dispatch: # 保留手动运行按钮
+
+# 赋予 GitHub Actions 自动提交代码的权限（保活插件必须要有这个权限）
+permissions:
+  contents: write
 
 jobs:
   daily-run:
@@ -30,3 +34,7 @@ jobs:
         NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
         PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
       run: python main.py
+
+    # 终极保活机制：防止 60 天无活动被 GitHub 暂停 cron 任务
+    - name: Keepalive Workflow
+      uses: gautamkrishnar/keepalive-workflow@v2
