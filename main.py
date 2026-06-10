@@ -1,4 +1,6 @@
 import os
+import re
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 from rich.console import Console
@@ -13,13 +15,131 @@ from push import push_to_wechat
 console = Console()
 
 
+def build_hardcore_html(news_list, digest_title="AI Hardcore Daily") -> str:
+    """
+    根据硬核 UI 模板生成最终的 HTML 字符串 (English Version)
+    智能容错解析，确保 AI 生成的内容一字不差地被填入模板
+    """
+    # 英文星期
+    weeks = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    # 强制获取东八区（北京时间），保证推送时间准确
+    bj_tz = timezone(timedelta(hours=8))
+    today = datetime.now(bj_tz)
+
+    # 英文日期格式，例如: Jun 10, 2026 Monday · 3 Stories
+    date_str = f"{today.strftime('%b %d, %Y')} {weeks[today.weekday()]} · {len(news_list)} Stories"
+
+    category_styles = {
+        "business": "background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;",
+        "tech": "background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE;",
+        "sports": "background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;",
+        "ai": "background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE;",
+        "default": "background:#FAFAFA;color:#52525B;border:1px solid #E4E4E7;"
+    }
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{digest_title}</title>
+  <style>
+    html, body {{ margin: 0; padding: 0; background: #ECECEC; }}
+    body {{ max-width: 430px; margin: 0 auto; min-height: 100vh; box-shadow: 0 0 24px rgba(0,0,0,0.08); }}
+  </style>
+</head>
+<body>
+  <div style="font-family:-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;background:#FFFFFF;padding:12px 10px 16px 10px;color:#171717;word-break:normal;overflow-wrap:break-word;-webkit-text-size-adjust:100%;">
+    <div style="margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid #07C160;">
+      <div style="font-size:20px;font-weight:700;line-height:1.3;color:#171717;margin:0 0 6px 0;">{digest_title}</div>
+      <div style="font-size:13px;line-height:1.5;color:#737373;margin:0;">{date_str}</div>
+    </div>
+"""
+
+    for i, item in enumerate(news_list, start=1):
+        index_str = f"{i:02d}"
+        category = item.get('category', 'Tech')
+        badge_style = category_styles.get(category.lower(), category_styles['default'])
+
+        # 英文默认占位符
+        title = item.get('title', 'No Title')
+        source = item.get('source', 'Unknown Source')
+        time_str = item.get('time', 'Today')
+        url = item.get('url', '#')
+
+        # 智能文本清洗
+        summary_raw = item.get('summary', '').strip()
+        points = []
+        li_matches = re.findall(r'<li>(.*?)</li>', summary_raw, re.DOTALL)
+
+        if li_matches:
+            points = [p.strip() for p in li_matches if p.strip()]
+
+        if not points:
+            clean_text = re.sub(r'</?(ul|ol|p|div|span)[^>]*>', '', summary_raw)
+            lines = clean_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line:
+                    line = re.sub(r'^([•\-*\d+\.]+)\s*', '', line).strip()
+                    if line:
+                        points.append(line)
+
+        if not points and summary_raw:
+            points = [re.sub(r'<[^>]+>', '', summary_raw).strip()]
+
+        table_rows_html = ""
+        for pt in points:
+            if pt:
+                table_rows_html += f"""
+          <tr><td style="padding:0 0 10px 0;vertical-align:top;width:16px;color:#07C160;font-size:15px;line-height:1.65;">•</td><td style="padding:0 0 10px 6px;color:#404040;font-size:15px;line-height:1.65;word-break:normal;overflow-wrap:break-word;">{pt}</td></tr>"""
+
+        html_content += f"""
+    <div style="margin-bottom:16px;background:#FAFAFA;border:1px solid #E5E5E5;border-radius:10px;overflow:hidden;word-break:normal;overflow-wrap:break-word;">
+      <div style="padding:14px 14px 0 14px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+          <tr>
+            <td style="width:36px;vertical-align:top;padding:0 10px 0 0;">
+              <div style="display:inline-block;min-width:32px;text-align:center;background:#07C160;color:#FFFFFF;font-size:13px;font-weight:700;line-height:32px;border-radius:8px;">{index_str}</div>
+            </td>
+            <td style="vertical-align:top;padding:0;">
+              <span style="display:inline-block;margin:0 0 8px 0;padding:2px 8px;{badge_style}font-size:11px;font-weight:600;line-height:1.4;border-radius:999px;letter-spacing:0.02em;">{category}</span>
+              <div style="color:#171717;font-size:16px;font-weight:600;line-height:1.45;margin:0 0 6px 0;word-break:normal;overflow-wrap:break-word;">{title}</div>
+              <div style="color:#737373;font-size:12px;line-height:1.4;margin:0 0 12px 0;">{source} · {time_str}</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="padding:0 14px 12px 14px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+          {table_rows_html}
+        </table>
+      </div>
+      <div style="padding:8px 14px 12px 14px;border-top:1px solid #E5E5E5;">
+        <a href="{url}" style="color:#576B95;font-size:11px;line-height:1.3;text-decoration:none;word-break:break-all;">Read Full Article →</a>
+      </div>
+    </div>
+"""
+
+    html_content += """
+    <div style="margin-top:4px;padding-top:12px;border-top:1px solid #E5E5E5;text-align:center;color:#737373;font-size:11px;line-height:1.5;">
+      Summary generated by Groq AI · Click link to read full article
+    </div>
+  </div>
+</body>
+</html>"""
+
+    return html_content
+
+
 def main():
     # 1. 加载环境变量
     load_dotenv()
 
     # 打印欢迎面板
     console.print(Panel.fit(
-        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 4.0 • Premium HTML Card Edition[/dim]",
+        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 5.0 • Hardcore UI Edition (English)[/dim]",
         title="[bold green]System Boot[/bold green]",
         border_style="magenta",
         padding=(1, 3)
@@ -38,18 +158,22 @@ def main():
         console.print("\n[yellow]📭 No news articles found at the moment.[/yellow]")
         return
 
-    # 3. 初始化微信端 HTML 容器样式（强制规定：整词换行，不许切断英文）
-    aggregated_summary = """
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; padding: 5px; word-break: normal;">
-        <h2 style="color: #191919; margin-bottom: 20px; border-bottom: 2px solid #07c160; padding-bottom: 8px; font-size: 18px;">📅 今日 AI 硬核早报</h2>
-    """
-    has_valid_content = False
+    processed_news = []
 
-    # 4. 遍历新闻，生成并打印总结
+    # 3. 遍历新闻，生成并打印总结
     for i, article in enumerate(articles, 1):
         title = article.get("title") or "No Title Available"
         description = article.get("description") or ""
         url = article.get("url") or "No URL"
+
+        # 安全地获取来源和时间，用于填充 UI
+        source_name = "Unknown Source"
+        if isinstance(article.get("source"), dict):
+            source_name = article.get("source").get("name", "Unknown Source")
+
+        published_at = "Today"
+        if article.get("publishedAt"):
+            published_at = str(article.get("publishedAt"))[:10]
 
         # 本地电脑终端打印（保持炫酷）
         console.print(f"\n[bold cyan]📰 [News {i}]: {title}[/bold cyan]")
@@ -63,7 +187,7 @@ def main():
             ))
             continue
 
-        # 调用 Groq AI
+        # 调用 Groq AI (完全不改变 AI 逻辑)
         with console.status("[bold green]AI is reading and digesting...[/bold green]", spinner="dots"):
             summary = summarize_article(title, description)
 
@@ -75,40 +199,28 @@ def main():
             padding=(1, 2)
         ))
 
-        # 5. 【核心清洗】将 AI 返回的 Markdown 列表符号清洗并转化为完美的 HTML 列表
-        lines = [line.strip() for line in summary.split("\n") if line.strip()]
-        html_bullets = ""
-        for line in lines:
-            # 去除 AI 输出可能带有的各种圆点或中划线符号，并清除 Markdown 的加粗符号 **
-            clean_line = line.lstrip("•-* ").strip().replace("**", "")
-            if clean_line:
-                # 每一条总结都强制注入 word-break: normal 确保英文完美换行
-                html_bullets += f"<li style='margin-bottom: 8px; text-align: justify; word-break: normal; word-wrap: break-word;'>{clean_line}</li>"
-
-        # 6. 【精装排版】构建极具高级感的 HTML 卡片（带灰色淡雅背景、左侧微信绿高亮条）
-        news_card = f"""
-        <div style="margin-bottom: 20px; background-color: #f8f9fa; padding: 14px; border-radius: 8px; border-left: 4px solid #07c160; word-break: normal; word-wrap: break-word; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <h3 style="margin: 0 0 12px 0; color: #111111; font-size: 15px; line-height: 1.4; word-break: normal; word-wrap: break-word;">📰 {i}. {title}</h3>
-            <ul style="padding-left: 18px; margin: 0 0 12px 0; color: #333333; font-size: 14px; line-height: 1.5; word-break: normal; word-wrap: break-word;">
-                {html_bullets}
-            </ul>
-            <div style="margin-top: 10px; border-top: 1px dashed #e0e0e0; padding-top: 8px;">
-                <a href="{url}" style="color: #576b95; font-size: 12.5px; text-decoration: none; word-break: break-all;">🔗 点击此处阅读原文</a>
-            </div>
-        </div>
-        """
-        aggregated_summary += news_card
-        has_valid_content = True
-
-    # 闭合 HTML 标签
-    aggregated_summary += "</div>"
+        # 将数据打包放入列表
+        processed_news.append({
+            "title": title,
+            "url": url,
+            "summary": summary,
+            "source": source_name,
+            "time": published_at,
+            "category": "Tech"  # 默认应用紫色科技标签样式
+        })
 
     console.print(f"\n[bold reverse green] ✅ All {limit} news stories processed successfully! [/bold reverse green]\n")
 
-    # 7. 触发微信一键推送
-    if has_valid_content:
-        with console.status("[bold green]Sending today's digest to your WeChat...[/bold green]", spinner="dots"):
-            success = push_to_wechat("📅 您有一份新的 AI 新闻早报", aggregated_summary)
+    # 4. 触发微信一键推送
+    if processed_news:
+        with console.status("[bold green]Generating Hardcore UI and sending to WeChat...[/bold green]", spinner="dots"):
+
+            # 第一步：把数据塞进硬核模板里，生成全英文的 UI
+            final_html_string = build_hardcore_html(processed_news, "AI Hardcore Daily")
+
+            # 第二步：将这串字符串直接交给你的快递员 push_to_wechat（注意这里传给微信的通知标题也改成了英文）
+            success = push_to_wechat("每日新闻", final_html_string)
+
             if success:
                 console.print("[bold green]✨ [WeChat Push Success] Delivered to your phone![/bold green]\n")
             else:
