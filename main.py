@@ -20,21 +20,20 @@ def build_hardcore_html(news_list, digest_title="AI Hardcore Daily") -> str:
     根据硬核 UI 模板生成最终的 HTML 字符串 (English Version)
     智能容错解析，确保 AI 生成的内容一字不差地被填入模板
     """
-    # 英文星期
     weeks = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
-    # 强制获取东八区（北京时间），保证推送时间准确
     bj_tz = timezone(timedelta(hours=8))
     today = datetime.now(bj_tz)
-
-    # 英文日期格式，例如: Jun 10, 2026 Monday · 3 Stories
     date_str = f"{today.strftime('%b %d, %Y')} {weeks[today.weekday()]} · {len(news_list)} Stories"
 
+    # 为所有 6 个新分类 + General 专属定制的高颜值调色盘
     category_styles = {
-        "business": "background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;",
-        "tech": "background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE;",
-        "sports": "background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;",
-        "ai": "background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE;",
+        "tech": "background:#F5F3FF;color:#6D28D9;border:1px solid #DDD6FE;",  # 紫色
+        "business": "background:#FFFBEB;color:#B45309;border:1px solid #FDE68A;",  # 黄色/琥珀
+        "sports": "background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;",  # 绿色
+        "politics": "background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;",  # 红色
+        "world": "background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;",  # 蓝色
+        "entertainment": "background:#FDF2F8;color:#BE185D;border:1px solid #FBCFE8;",  # 粉色
+        "general": "background:#FAFAFA;color:#52525B;border:1px solid #E4E4E7;",  # 灰色
         "default": "background:#FAFAFA;color:#52525B;border:1px solid #E4E4E7;"
     }
 
@@ -59,20 +58,18 @@ def build_hardcore_html(news_list, digest_title="AI Hardcore Daily") -> str:
 
     for i, item in enumerate(news_list, start=1):
         index_str = f"{i:02d}"
-        category = item.get('category', 'Tech')
+        category = item.get('category', 'General')
         badge_style = category_styles.get(category.lower(), category_styles['default'])
 
-        # 英文默认占位符
         title = item.get('title', 'No Title')
         source = item.get('source', 'Unknown Source')
         time_str = item.get('time', 'Today')
         url = item.get('url', '#')
 
-        # 智能文本清洗
         summary_raw = item.get('summary', '').strip()
         points = []
-        li_matches = re.findall(r'<li>(.*?)</li>', summary_raw, re.DOTALL)
 
+        li_matches = re.findall(r'<li>(.*?)</li>', summary_raw, re.DOTALL)
         if li_matches:
             points = [p.strip() for p in li_matches if p.strip()]
 
@@ -134,18 +131,15 @@ def build_hardcore_html(news_list, digest_title="AI Hardcore Daily") -> str:
 
 
 def main():
-    # 1. 加载环境变量
     load_dotenv()
 
-    # 打印欢迎面板
     console.print(Panel.fit(
-        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 5.0 • Hardcore UI Edition (English)[/dim]",
+        "🚀 [bold magenta]Mini AI News Summarizer[/bold magenta]\n[dim]Version 5.2 • 6-Category Extended UI[/dim]",
         title="[bold green]System Boot[/bold green]",
         border_style="magenta",
         padding=(1, 3)
     ))
 
-    # 2. 获取新闻
     limit = 3
     with console.status("[bold blue]Connecting to NewsAPI and fetching headlines...[/bold blue]", spinner="earth"):
         try:
@@ -160,13 +154,11 @@ def main():
 
     processed_news = []
 
-    # 3. 遍历新闻，生成并打印总结
     for i, article in enumerate(articles, 1):
         title = article.get("title") or "No Title Available"
         description = article.get("description") or ""
         url = article.get("url") or "No URL"
 
-        # 安全地获取来源和时间，用于填充 UI
         source_name = "Unknown Source"
         if isinstance(article.get("source"), dict):
             source_name = article.get("source").get("name", "Unknown Source")
@@ -175,50 +167,66 @@ def main():
         if article.get("publishedAt"):
             published_at = str(article.get("publishedAt"))[:10]
 
-        # 本地电脑终端打印（保持炫酷）
         console.print(f"\n[bold cyan]📰 [News {i}]: {title}[/bold cyan]")
         console.print(f"[dim]🔗 Link: {url}[/dim]")
 
-        # 处理空内容
         if not description or description.isspace():
-            console.print(Panel(
-                "[yellow]⚠️ This article lacks sufficient body text for AI to summarize.[/yellow]",
-                border_style="yellow"
-            ))
+            console.print(Panel("[yellow]⚠️ This article lacks sufficient body text.[/yellow]", border_style="yellow"))
             continue
 
-        # 调用 Groq AI (完全不改变 AI 逻辑)
         with console.status("[bold green]AI is reading and digesting...[/bold green]", spinner="dots"):
-            summary = summarize_article(title, description)
+            raw_ai_response = summarize_article(title, description)
 
-        # 本地电脑终端漂亮的绿色面板渲染
+        # ==========================================
+        # ✂️ 智能拆解逻辑（已更新为 6 个分类 + General 兜底）
+        # ==========================================
+        raw_lines = [line.strip() for line in raw_ai_response.strip().split('\n') if line.strip()]
+
+        category = "General"  # 1. 默认分类改为 General
+        actual_summary_lines = []
+
+        if raw_lines:
+            first_line_lower = raw_lines[0].lower()
+            has_category = False
+
+            # 2. 检查大模型返回的第一行是否属于这 6 个新分类
+            valid_categories = ["Tech", "Business", "Sports", "Politics", "World", "Entertainment"]
+            for valid_cat in valid_categories:
+                if valid_cat.lower() in first_line_lower:
+                    category = valid_cat  # 保留完美的大小写
+                    has_category = True
+                    break
+
+            if has_category:
+                actual_summary_lines = raw_lines[1:]
+            else:
+                # 容错：如果 AI 没有返回分类，所有内容均视作正文，标签使用默认的 General
+                actual_summary_lines = raw_lines
+
+        actual_summary = '\n'.join(actual_summary_lines)
+        # ==========================================
+
         console.print(Panel(
-            Markdown(summary),
-            title="[bold green]🤖 AI Summary[/bold green]",
+            Markdown(actual_summary),
+            title=f"[bold green]🤖 AI Summary ({category})[/bold green]",
             border_style="green",
             padding=(1, 2)
         ))
 
-        # 将数据打包放入列表
         processed_news.append({
             "title": title,
             "url": url,
-            "summary": summary,
+            "summary": actual_summary,
             "source": source_name,
             "time": published_at,
-            "category": "Tech"  # 默认应用紫色科技标签样式
+            "category": category
         })
 
     console.print(f"\n[bold reverse green] ✅ All {limit} news stories processed successfully! [/bold reverse green]\n")
 
-    # 4. 触发微信一键推送
     if processed_news:
         with console.status("[bold green]Generating Hardcore UI and sending to WeChat...[/bold green]", spinner="dots"):
-
-            # 第一步：把数据塞进硬核模板里，生成全英文的 UI
             final_html_string = build_hardcore_html(processed_news, "AI Hardcore Daily")
-
-            # 第二步：将这串字符串直接交给你的快递员 push_to_wechat（注意这里传给微信的通知标题也改成了英文）
             success = push_to_wechat("每日新闻", final_html_string)
 
             if success:

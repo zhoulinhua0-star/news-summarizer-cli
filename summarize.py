@@ -16,7 +16,16 @@ def summarize_article(title: str, description: str) -> str:
         api_key=api_key
     )
 
-    prompt = f"Summarize this news article in exactly 3 bullet points. Keep it concise, objective, and easy to read.\n\nTitle: {str(title)}\nContent: {str(description)}"
+    prompt = f"""
+    Please read the following news article and complete two tasks:
+
+    1. [Line 1]: Strictly choose the most appropriate category from the following 6 words (Tech, Business, Sports, Politics, World, Entertainment). Output ONLY this single word on the first line. Do not include any other characters or labels. If it doesn't fit any, output 'General'.
+    2. [Line 2 and onwards]: Summarize the article into exactly 3 concise, objective, and easy-to-read bullet points in English. You MUST wrap each bullet point in <li> tags.
+
+    News Article:
+    Title: {str(title)}
+    Content: {str(description)}
+    """
 
     try:
         response = client.chat.completions.create(
